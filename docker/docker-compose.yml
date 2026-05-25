@@ -1,0 +1,300 @@
+version: "3.9"
+
+x-backend-env: &backend-env
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://marketing_os:marketing_os_pass@postgres:5432/marketing_os}
+  DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql://marketing_os:marketing_os_pass@postgres:5432/marketing_os}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+  QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+  TEMPORAL_HOST: ${TEMPORAL_HOST:-temporal:7233}
+  GROQ_API_KEY: ${GROQ_API_KEY}
+  APIFY_API_KEY: ${APIFY_API_KEY}
+  SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+  APP_ENV: ${APP_ENV:-development}
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marketing_os}
+      POSTGRES_USER: ${POSTGRES_USER:-marketing_os}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-marketing_os_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketing_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+
+  temporal:
+    image: temporalio/auto-setup:1.24
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-marketing_os}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-marketing_os_pass}
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/config/dynamicconfig/development-sql.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    ports:
+      - "8080:8080"
+    depends_on:
+      - temporal
+
+  # ── Backend Services ─────────────────────────────────────────
+  intake-service:
+    build:
+      context: ../backend
+      dockerfile: services/intake_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8001
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../backend:/app
+      - ../migrations:/app/migrations
+      - ../scripts:/app/scripts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn services.intake_service.main:app --host 0.0.0.0 --port 8001 --reload
+
+  scraper-service:
+    build:
+      context: ../backend
+      dockerfile: services/scraper_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8002
+    ports:
+      - "8002:8002"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn services.scraper_service.main:app --host 0.0.0.0 --port 8002 --reload
+
+  intelligence-service:
+    build:
+      context: ../backend
+      dockerfile: services/intelligence_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8003
+    ports:
+      - "8003:8003"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn services.intelligence_service.main:app --host 0.0.0.0 --port 8003 --reload
+
+  positioning-service:
+    build:
+      context: ../backend
+      dockerfile: services/positioning_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8004
+    ports:
+      - "8004:8004"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn services.positioning_service.main:app --host 0.0.0.0 --port 8004 --reload
+
+  icp-service:
+    build:
+      context: ../backend
+      dockerfile: services/icp_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8005
+    ports:
+      - "8005:8005"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn services.icp_service.main:app --host 0.0.0.0 --port 8005 --reload
+
+  embedding-service:
+    build:
+      context: ../backend
+      dockerfile: services/embedding_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8006
+    ports:
+      - "8006:8006"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      qdrant:
+        condition: service_started
+    command: uvicorn services.embedding_service.main:app --host 0.0.0.0 --port 8006 --reload
+
+  campaign-context-service:
+    build:
+      context: ../backend
+      dockerfile: services/campaign_context_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8007
+    ports:
+      - "8007:8007"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn services.campaign_context_service.main:app --host 0.0.0.0 --port 8007 --reload
+
+  orchestrator:
+    build:
+      context: ../backend
+      dockerfile: services/orchestrator/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8008
+    ports:
+      - "8008:8008"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      - temporal
+      - redis
+    command: ["sh", "-c", "uvicorn services.orchestrator.main:app --host 0.0.0.0 --port 8008 --reload & sleep 20 && python -m services.orchestrator.app.worker"]
+
+  notification-service:
+    build:
+      context: ../backend
+      dockerfile: services/notification_service/Dockerfile
+    environment:
+      <<: *backend-env
+      SERVICE_PORT: 8009
+    ports:
+      - "8009:8009"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: uvicorn services.notification_service.main:app --host 0.0.0.0 --port 8009 --reload
+
+  celery-worker:
+    build:
+      context: ../backend
+      dockerfile: services/celery_worker/Dockerfile
+    environment:
+      <<: *backend-env
+    volumes:
+      - ../backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: celery -A shared.celery_app worker --loglevel=info --concurrency=4 -Q scraper:jobs,intelligence:extract,positioning:generate,icp:generate,embedding:upsert
+
+  celery-beat:
+    build:
+      context: ../backend
+      dockerfile: services/celery_worker/Dockerfile
+    environment:
+      <<: *backend-env
+    volumes:
+      - ../backend:/app
+    depends_on:
+      - redis
+    command: celery -A shared.celery_app beat --loglevel=info
+
+  # ── Frontend ─────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_WS_URL: ws://localhost/ws
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+  # ── Nginx Gateway ─────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - intake-service
+      - scraper-service
+      - intelligence-service
+      - positioning-service
+      - icp-service
+      - embedding-service
+      - campaign-context-service
+      - orchestrator
+      - notification-service
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

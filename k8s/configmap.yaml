@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marketing-os-config
+  namespace: marketing-os
+data:
+  POSTGRES_DB: marketing_os
+  POSTGRES_USER: marketing_os
+  REDIS_URL: redis://redis-service:6379/0
+  QDRANT_URL: http://qdrant-service:6333
+  TEMPORAL_HOST: temporal-service:7233
+  CELERY_BROKER_URL: redis://redis-service:6379/1
+  CELERY_RESULT_BACKEND: redis://redis-service:6379/2
+  INTAKE_SERVICE_PORT: "8001"
+  SCRAPER_SERVICE_PORT: "8002"
+  INTELLIGENCE_SERVICE_PORT: "8003"
+  POSITIONING_SERVICE_PORT: "8004"
+  ICP_SERVICE_PORT: "8005"
+  EMBEDDING_SERVICE_PORT: "8006"
+  CAMPAIGN_CONTEXT_SERVICE_PORT: "8007"
+  ORCHESTRATOR_SERVICE_PORT: "8008"
+  NOTIFICATION_SERVICE_PORT: "8009"
+  GROQ_MODEL_COMPLEX: llama-3.3-70b-versatile
+  GROQ_MODEL_FAST: llama-3.1-8b-instant

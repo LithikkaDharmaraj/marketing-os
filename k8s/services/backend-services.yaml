@@ -1,0 +1,419 @@
+---
+# Shared env ref for all backend services
+# Each service below follows the same Deployment + Service pattern.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intake-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: intake-service
+  template:
+    metadata:
+      labels:
+        app: intake-service
+    spec:
+      containers:
+        - name: intake-service
+          image: marketing-os/intake-service:latest
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intake-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: intake-service
+  ports:
+    - port: 8001
+      targetPort: 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scraper-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scraper-service
+  template:
+    metadata:
+      labels:
+        app: scraper-service
+    spec:
+      containers:
+        - name: scraper-service
+          image: marketing-os/scraper-service:latest
+          ports:
+            - containerPort: 8002
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scraper-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: scraper-service
+  ports:
+    - port: 8002
+      targetPort: 8002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: intelligence-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: intelligence-service
+  template:
+    metadata:
+      labels:
+        app: intelligence-service
+    spec:
+      containers:
+        - name: intelligence-service
+          image: marketing-os/intelligence-service:latest
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: intelligence-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: intelligence-service
+  ports:
+    - port: 8003
+      targetPort: 8003
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: positioning-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: positioning-service
+  template:
+    metadata:
+      labels:
+        app: positioning-service
+    spec:
+      containers:
+        - name: positioning-service
+          image: marketing-os/positioning-service:latest
+          ports:
+            - containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: positioning-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: positioning-service
+  ports:
+    - port: 8004
+      targetPort: 8004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: icp-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: icp-service
+  template:
+    metadata:
+      labels:
+        app: icp-service
+    spec:
+      containers:
+        - name: icp-service
+          image: marketing-os/icp-service:latest
+          ports:
+            - containerPort: 8005
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icp-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: icp-service
+  ports:
+    - port: 8005
+      targetPort: 8005
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding-service
+  namespace: marketing-os
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: embedding-service
+  template:
+    metadata:
+      labels:
+        app: embedding-service
+    spec:
+      containers:
+        - name: embedding-service
+          image: marketing-os/embedding-service:latest
+          ports:
+            - containerPort: 8006
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: embedding-service
+  ports:
+    - port: 8006
+      targetPort: 8006
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campaign-context-service
+  namespace: marketing-os
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: campaign-context-service
+  template:
+    metadata:
+      labels:
+        app: campaign-context-service
+    spec:
+      containers:
+        - name: campaign-context-service
+          image: marketing-os/campaign-context-service:latest
+          ports:
+            - containerPort: 8007
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: campaign-context-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: campaign-context-service
+  ports:
+    - port: 8007
+      targetPort: 8007
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orchestrator
+  namespace: marketing-os
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orchestrator
+  template:
+    metadata:
+      labels:
+        app: orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: marketing-os/orchestrator:latest
+          ports:
+            - containerPort: 8008
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orchestrator-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: orchestrator
+  ports:
+    - port: 8008
+      targetPort: 8008
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: marketing-os/notification-service:latest
+          ports:
+            - containerPort: 8009
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - port: 8009
+      targetPort: 8009
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: marketing-os
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+        - name: celery-worker
+          image: marketing-os/celery-worker:latest
+          command:
+            - celery
+            - -A
+            - shared.celery_app
+            - worker
+            - --loglevel=info
+            - -Q
+            - scraper:jobs,intelligence:extract,positioning:generate,icp:generate,embedding:upsert,default
+          envFrom:
+            - configMapRef:
+                name: marketing-os-config
+            - secretRef:
+                name: marketing-os-secrets
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: marketing-os
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: marketing-os/frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: /api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: marketing-os
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
