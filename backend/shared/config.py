@@ -26,11 +26,15 @@ class Settings(BaseSettings):
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"
 
-    # LLM
+    # LLM — Groq (primary)
     groq_api_key: str = ""
     groq_model_large: str = "llama-3.3-70b-versatile"
     groq_model_fast: str = "llama-3.1-8b-instant"
     groq_max_tokens: int = 4096
+
+    # LLM — OpenAI (fallback when Groq hits rate limit)
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
 
     # Scraping
     apify_api_key: str = ""

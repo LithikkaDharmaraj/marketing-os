@@ -32,8 +32,9 @@ class LinkedInCompanyActor(BaseApifyActor):
 
 
 class LinkedInProfileActor(BaseApifyActor):
-    actor_id = "pratikdani~linkedin-people-profile-scraper"
-    timeout_seconds = 180
+    """Scrapes individual LinkedIn profiles via harvestapi."""
+    actor_id = "harvestapi~linkedin-profile-scraper"
+    timeout_seconds = 240
 
     def build_input(self, profile_urls: list[str], **kwargs) -> dict:
         return {
@@ -44,14 +45,20 @@ class LinkedInProfileActor(BaseApifyActor):
     def normalize(self, raw_items: list[dict]) -> dict:
         profiles = []
         for item in raw_items:
+            # harvestapi returns firstName/lastName or fullName
+            full_name = item.get("fullName") or (
+                f"{item.get('firstName', '')} {item.get('lastName', '')}".strip()
+            )
+            positions = item.get("positions", []) or item.get("experience", [])
+            current = positions[0] if positions else {}
             profiles.append({
-                "full_name": f"{item.get('firstName', '')} {item.get('lastName', '')}".strip(),
+                "full_name": full_name,
                 "headline": item.get("headline", ""),
-                "current_title": item.get("positions", [{}])[0].get("title", "") if item.get("positions") else "",
-                "current_company": item.get("positions", [{}])[0].get("companyName", "") if item.get("positions") else "",
-                "location": item.get("location", ""),
-                "summary": item.get("summary", ""),
-                "linkedin_url": item.get("linkedinUrl", ""),
+                "current_title": current.get("title", "") or item.get("headline", ""),
+                "current_company": current.get("companyName", "") or current.get("company", ""),
+                "location": item.get("location", "") or item.get("geoLocation", ""),
+                "summary": item.get("summary", "") or item.get("about", ""),
+                "linkedin_url": item.get("linkedinUrl", "") or item.get("profileUrl", ""),
                 "connections": item.get("connectionsCount", 0),
             })
         return {"profiles": profiles}

@@ -65,6 +65,9 @@ async def create_intake(
             "website_url": existing_company.website_url,
             "linkedin_url": existing_company.linkedin_url,
             "competitors": request.competitors,
+            "company_name": existing_company.name,
+            "domain": existing_company.domain or "",
+            "industry": existing_company.industry or "",
         }
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -121,14 +124,9 @@ async def create_intake(
     product = Product(
         tenant_id=request.tenant_id,
         company_id=company.id,
-        name=request.product_name or request.company_name,
-        description=request.product_description or request.services_products,
-        product_type=request.product_type,
+        name=request.company_name,
+        description=request.product_description,
         pricing_range=request.pricing_range,
-        core_features=request.core_features,
-        differentiators=request.differentiators,
-        problems_solved=request.problems_solved,
-        target_market=request.target_market,
         goals=request.goals,
         raw_intake=request.model_dump(mode="json"),
     )
@@ -166,6 +164,15 @@ async def create_intake(
         "linkedin_url": request.linkedin_url,
         "competitors": request.competitors,
         "workflow_run_id": str(run.id),
+        "company_name": request.company_name,
+        "domain": domain,
+        "industry": request.industry,
+        "product_description": request.product_description,
+        "main_problem_solved": request.main_problem_solved,
+        "target_industry": request.target_industry,
+        "target_company_size": request.target_company_size,
+        "target_departments": request.target_departments,
+        "pricing_range": request.pricing_range,
     }
     try:
         async with httpx.AsyncClient(timeout=10) as client:

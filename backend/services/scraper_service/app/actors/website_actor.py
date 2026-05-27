@@ -36,10 +36,10 @@ class WebsiteActor(BaseApifyActor):
                 "meta_keywords": metadata.get("keywords", ""),
                 "is_homepage": _is_homepage(url),
                 "is_pricing": _is_pricing_page(url),
+                "is_product": _is_product_page(url),
                 "is_contact": _is_contact_page(url),
             })
 
-            # Extract emails and phones from text
             if text:
                 for e in _extract_emails(text):
                     emails.add(e)
@@ -49,16 +49,25 @@ class WebsiteActor(BaseApifyActor):
 
         homepage = next((p for p in pages if p["is_homepage"]), pages[0] if pages else {})
         pricing_page = next((p for p in pages if p["is_pricing"]), {})
+        product_page = next((p for p in pages if p.get("is_product")), {})
 
+        homepage_text = homepage.get("text_preview", "")
         return {
             "pages": pages,
             "homepage": homepage,
             "pricing_page": pricing_page,
+            "product_page": product_page,
             "emails": list(emails)[:10],
             "phones": list(phones)[:5],
             "ctas": list(set(ctas))[:20],
             "total_pages_crawled": len(pages),
             "all_text": " ".join(p.get("text_preview", "") for p in pages[:10]),
+            # Convenience top-level fields used by LLM prompts
+            "homepage_headline": homepage.get("title", ""),
+            "homepage_copy": homepage_text[:1500],
+            "product_page_text": product_page.get("text_preview", "")[:2000],
+            "pricing_page_text": pricing_page.get("text_preview", "")[:1000],
+            "pricing_signals": _extract_pricing_signals(pricing_page.get("text_preview", "")),
         }
 
 
@@ -74,6 +83,20 @@ def _is_pricing_page(url: str) -> bool:
 
 def _is_contact_page(url: str) -> bool:
     return any(kw in url.lower() for kw in ["contact", "reach", "support"])
+
+
+def _is_product_page(url: str) -> bool:
+    return any(kw in url.lower() for kw in ["product", "features", "solution", "platform", "how-it-works", "capabilities"])
+
+
+def _extract_pricing_signals(text: str) -> list[str]:
+    import re
+    signals = []
+    price_matches = re.findall(r"\$[\d,]+(?:/(?:mo|month|yr|year|user))?", text, re.IGNORECASE)
+    signals.extend(price_matches[:5])
+    tier_matches = re.findall(r"(starter|basic|pro|professional|enterprise|growth|business|free|premium|team)\s+plan", text, re.IGNORECASE)
+    signals.extend(list(dict.fromkeys(m.strip() for m in tier_matches))[:4])
+    return signals[:8]
 
 
 def _extract_emails(text: str) -> list[str]:

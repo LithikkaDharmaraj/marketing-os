@@ -20,9 +20,14 @@ export default function ICPPage() {
             <h1 className="text-2xl font-bold text-gray-900">Ideal Customer Profiles</h1>
             <p className="text-sm text-gray-500 mt-1">AI-generated buyer personas with firmographic and psychographic detail</p>
           </div>
-          <Link href={`/blueprint/${businessId}`} className="btn-primary">
-            View Blueprint →
-          </Link>
+          <div className="flex gap-3">
+            <Link href={`/targets/${businessId}`} className="btn-primary">
+              View Targets →
+            </Link>
+            <Link href={`/blueprint/${businessId}`} className="btn-secondary">
+              Blueprint
+            </Link>
+          </div>
         </div>
 
         {isLoading ? (

@@ -5,6 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from shared.utils.db import get_db
 from services.icp_service.app.service import generate_icps
+from services.icp_service.app.target_discovery import (
+    discover_target_companies,
+    get_target_companies,
+    get_target_contacts,
+)
 
 router = APIRouter()
 
@@ -39,6 +44,26 @@ async def get_icp(company_id: uuid.UUID, icp_id: uuid.UUID, db: AsyncSession = D
     if not row:
         raise HTTPException(status_code=404, detail="ICP not found")
     return dict(row)
+
+
+@router.post("/targets/discover")
+async def trigger_target_discovery(
+    company_id: uuid.UUID,
+    tenant_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    companies = await discover_target_companies(company_id, tenant_id, db)
+    return {"status": "completed", "count": len(companies)}
+
+
+@router.get("/targets/{company_id}/companies")
+async def list_target_companies(company_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    return await get_target_companies(company_id, db)
+
+
+@router.get("/targets/{company_id}/contacts")
+async def list_target_contacts(company_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    return await get_target_contacts(company_id, db)
 
 
 class ICPSearchRequest(BaseModel):

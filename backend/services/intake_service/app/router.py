@@ -43,8 +43,9 @@ async def get_intake_status(
         select(WorkflowRun)
         .where(WorkflowRun.company_id == company_id)
         .order_by(WorkflowRun.created_at.desc())
+        .limit(1)
     )
-    run = run_result.scalar_one_or_none()
+    run = run_result.scalars().first()
 
     return IntakeStatusResponse(
         company_id=company.id,

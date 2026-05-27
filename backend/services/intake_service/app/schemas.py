@@ -30,16 +30,13 @@ class CompanyIntakeRequest(BaseModel):
     crunchbase_url: Optional[str] = None
     additional_notes: Optional[str] = None
 
-    # Product (optional — AI extracts from website)
-    product_type: Optional[str] = None
-    product_name: Optional[str] = None
+    # Product hints (optional — AI extracts full detail from website)
     product_description: Optional[str] = None
-    services_products: Optional[str] = None
-    target_market: Optional[str] = None
+    main_problem_solved: Optional[str] = None
+    target_industry: list[str] = []
+    target_company_size: Optional[str] = None
+    target_departments: list[str] = []
     pricing_range: Optional[str] = None
-    core_features: list[str] = []
-    differentiators: list[str] = []
-    problems_solved: list[str] = []
 
     # Competitors (all optional)
     competitors: list[str] = []

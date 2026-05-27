@@ -4,18 +4,13 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from services.orchestrator.app.activities.scraping_activities import (
-        ScrapeWebsiteActivity,
-        ScrapeLinkedInActivity,
-        ScrapeCrunchbaseActivity,
-        ScrapeCompetitorsActivity,
-        ScrapePublicSignalsActivity,
-    )
+    from services.orchestrator.app.activities.scraping_activities import ScrapeWebsiteActivity
     from services.orchestrator.app.activities.intelligence_activity import ExtractIntelligenceActivity
     from services.orchestrator.app.activities.positioning_activity import GeneratePositioningActivity
     from services.orchestrator.app.activities.icp_activity import GenerateICPActivity
     from services.orchestrator.app.activities.embedding_activity import EmbedProfilesActivity
     from services.orchestrator.app.activities.notification_activity import PublishProgressActivity
+    from services.orchestrator.app.activities.target_discovery_activity import DiscoverTargetsActivity
 
 RETRY_POLICY = RetryPolicy(
     maximum_attempts=3,
@@ -53,47 +48,26 @@ class BusinessOnboardingWorkflow:
             )
 
         try:
-            # Step 1: Scraping (parallel fan-out)
+            # Step 1: Scraping — one comprehensive call handles website + LinkedIn + competitors + signals
             await notify("scraping", 1)
-            scrape_tasks = [
-                workflow.execute_activity(
-                    ScrapeWebsiteActivity.run,
-                    args=[{"company_id": company_id, "tenant_id": tenant_id, "website_url": website_url}],
-                    **_OPTS,
-                ),
-                workflow.execute_activity(
-                    ScrapePublicSignalsActivity.run,
-                    args=[{"company_id": company_id, "tenant_id": tenant_id}],
-                    **_OPTS,
-                ),
-                workflow.execute_activity(
-                    ScrapeCrunchbaseActivity.run,
-                    args=[{"company_id": company_id, "tenant_id": tenant_id}],
-                    **_OPTS,
-                ),
-            ]
-            if linkedin_url:
-                scrape_tasks.append(
-                    workflow.execute_activity(
-                        ScrapeLinkedInActivity.run,
-                        args=[{"company_id": company_id, "tenant_id": tenant_id, "linkedin_url": linkedin_url}],
-                        **_OPTS,
-                    )
-                )
-            if competitors:
-                scrape_tasks.append(
-                    workflow.execute_activity(
-                        ScrapeCompetitorsActivity.run,
-                        args=[{"company_id": company_id, "tenant_id": tenant_id, "competitors": competitors}],
-                        **_OPTS,
-                    )
-                )
-
-            await asyncio.gather(*scrape_tasks, return_exceptions=True)
+            await workflow.execute_activity(
+                ScrapeWebsiteActivity.run,
+                args=[{
+                    "company_id": company_id,
+                    "tenant_id": tenant_id,
+                    "website_url": website_url,
+                    "linkedin_url": linkedin_url,
+                    "competitors": competitors,
+                    "company_name": params.get("company_name", ""),
+                    "industry": params.get("industry", ""),
+                    "domain": params.get("domain", ""),
+                }],
+                **_OPTS,
+            )
 
             await notify("cleaning", 2)
 
-            # Step 3: Business Intelligence
+            # Step 3: Business Intelligence (extracts product intelligence too)
             await notify("extracting", 3)
             await workflow.execute_activity(
                 ExtractIntelligenceActivity.run,
@@ -101,7 +75,7 @@ class BusinessOnboardingWorkflow:
                 **_OPTS,
             )
 
-            # Step 4: Positioning
+            # Step 4: Positioning (uses product intelligence)
             await notify("positioning", 4)
             await workflow.execute_activity(
                 GeneratePositioningActivity.run,
@@ -109,7 +83,7 @@ class BusinessOnboardingWorkflow:
                 **_OPTS,
             )
 
-            # Step 5: ICP Generation
+            # Step 5: ICP Generation (uses product intelligence + positioning)
             await notify("icp_generating", 5)
             await workflow.execute_activity(
                 GenerateICPActivity.run,
@@ -117,12 +91,21 @@ class BusinessOnboardingWorkflow:
                 **_OPTS,
             )
 
-            # Step 6: Embedding
-            await notify("embedding", 6)
-            await workflow.execute_activity(
-                EmbedProfilesActivity.run,
-                args=[{"company_id": company_id, "tenant_id": tenant_id}],
-                **_OPTS,
+            # Steps 6 + 7: Target Discovery and Embedding run in PARALLEL
+            # — both depend on ICP/positioning but not on each other
+            await notify("target_discovering", 6)
+            await asyncio.gather(
+                workflow.execute_activity(
+                    DiscoverTargetsActivity.run,
+                    args=[{"company_id": company_id, "tenant_id": tenant_id}],
+                    **_OPTS,
+                ),
+                workflow.execute_activity(
+                    EmbedProfilesActivity.run,
+                    args=[{"company_id": company_id, "tenant_id": tenant_id}],
+                    **_OPTS,
+                ),
+                return_exceptions=True,
             )
 
             await notify("completed", 8, "Marketing blueprint ready")

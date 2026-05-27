@@ -1,6 +1,19 @@
 from pydantic import BaseModel, Field
 
 
+class ProductIntelligence(BaseModel):
+    """Structured product intelligence — the core driver for all downstream GTM outputs."""
+    product_name: str = Field(default="", description="The primary product or service name")
+    product_description: str = Field(default="", description="2-3 sentence product description")
+    main_features: list[str] = Field(default_factory=list, description="Top 5-7 core features")
+    main_problem_solved: str = Field(default="", description="The #1 problem the product solves")
+    target_industry: str = Field(default="", description="Primary target industry vertical")
+    target_company_size: str = Field(default="", description="Ideal company size e.g. 100-5000 employees, Enterprise")
+    deployment_model: str = Field(default="", description="Cloud SaaS, On-premise, Hybrid, API")
+    use_cases: list[str] = Field(default_factory=list, description="Top 3-5 use cases")
+    pricing_signals: list[str] = Field(default_factory=list, description="Pricing tiers or signals found on website")
+
+
 class CompetitorSummary(BaseModel):
     """Lightweight summary kept for backward compat in BusinessProfile.competitive_landscape."""
     name: str
@@ -12,41 +25,6 @@ class CompetitorSummary(BaseModel):
     differentiation_opportunities: list[str] = Field(default_factory=list)
     competitiveness_level: str = ""
 
-
-class DiscoveredCompetitor(BaseModel):
-    """Full competitor profile used for both AI-discovered and user-suggested competitors."""
-    name: str
-    website: str = ""
-    category: str = ""
-    positioning: str = ""
-    target_audience: list[str] = Field(default_factory=list)
-    pricing_model: str = ""
-    core_features: list[str] = Field(default_factory=list)
-    strengths: list[str] = Field(default_factory=list)
-    weaknesses: list[str] = Field(default_factory=list, description="Relative weaknesses vs our company")
-    messaging_style: str = ""
-    differentiators: list[str] = Field(default_factory=list, description="How they differentiate from our company")
-    differentiation_opportunities: list[str] = Field(default_factory=list, description="Gaps our company can exploit")
-    market_segment: str = ""
-    estimated_company_size: str = ""
-    competitor_type: str = Field(default="direct", description="direct | indirect | emerging")
-    competitiveness_level: str = Field(
-        default="",
-        description="Highly Competitive | Moderately Competitive | Less Competitive",
-    )
-    confidence_score: float = Field(default=0.7, ge=0.0, le=1.0)
-    similarity_score: float = Field(default=0.0, ge=0.0, le=1.0)
-    discovery_source: str = Field(
-        default="ai_reasoning",
-        description="ai_reasoning | google_search | vector_similarity | user_provided",
-    )
-    discovered_by_ai: bool = True
-    user_provided: bool = False
-
-
-class CompetitorDiscoveryResponse(BaseModel):
-    """Groq output schema for AI competitor discovery."""
-    competitors: list[DiscoveredCompetitor]
 
 
 class BusinessProfileSchema(BaseModel):
@@ -68,4 +46,5 @@ class BusinessProfileSchema(BaseModel):
     competitive_landscape: list[CompetitorSummary] = Field(default_factory=list)
     key_differentiators: list[str] = Field(default_factory=list)
     pricing_model: str = Field(default="", description="Subscription, usage, freemium, etc.")
+    product_intelligence: ProductIntelligence = Field(default_factory=ProductIntelligence, description="Structured product-level intelligence driving all GTM outputs")
     confidence_score: float = Field(default=0.8, ge=0.0, le=1.0)

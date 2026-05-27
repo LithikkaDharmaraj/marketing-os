@@ -15,6 +15,7 @@ from services.orchestrator.app.activities.positioning_activity import GeneratePo
 from services.orchestrator.app.activities.icp_activity import GenerateICPActivity
 from services.orchestrator.app.activities.embedding_activity import EmbedProfilesActivity
 from services.orchestrator.app.activities.notification_activity import PublishProgressActivity
+from services.orchestrator.app.activities.target_discovery_activity import DiscoverTargetsActivity
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -40,6 +41,7 @@ async def main():
             GenerateICPActivity().run,
             EmbedProfilesActivity().run,
             PublishProgressActivity().run,
+            DiscoverTargetsActivity().run,
         ],
     )
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from shared.utils.db import get_db
-from shared.models.company import Company
+from shared.models.company import Company, WorkflowRun
 from services.intelligence_service.app.service import extract_business_intelligence
 
 router = APIRouter()
@@ -28,6 +28,15 @@ async def get_intelligence(company_id: uuid.UUID, db: AsyncSession = Depends(get
 
     enriched = company.enriched_data or {}
 
+    # Fetch latest workflow run to expose stuck-state to frontend
+    run_result = await db.execute(
+        select(WorkflowRun)
+        .where(WorkflowRun.company_id == company.id)
+        .order_by(WorkflowRun.created_at.desc())
+        .limit(1)
+    )
+    latest_run = run_result.scalars().first()
+
     # Support both new keys and legacy key for backward compat
     ai_discovered = enriched.get("ai_discovered_competitors") or enriched.get("competitor_profiles", [])
     user_suggested = enriched.get("user_suggested_competitors", [])
@@ -38,10 +47,10 @@ async def get_intelligence(company_id: uuid.UUID, db: AsyncSession = Depends(get
         "industry": company.industry,
         "business_model": company.business_model,
         "status": company.intelligence_status.value,
+        "workflow_run_status": latest_run.status if latest_run else None,
         "business_profile": enriched.get("business_profile"),
         "ai_discovered_competitors": ai_discovered,
         "user_suggested_competitors": user_suggested,
-        # Legacy key kept for consumers that still read competitor_profiles
         "competitor_profiles": ai_discovered,
     }
 

@@ -42,6 +42,13 @@ export const approvePositioning = (companyId: string) =>
 export const getICPs = (companyId: string) =>
   apiClient.get(`/v1/icp/${companyId}`).then((r) => r.data);
 
+// Target Discovery
+export const getTargetCompanies = (companyId: string) =>
+  apiClient.get(`/v1/targets/${companyId}/companies`).then((r) => r.data);
+
+export const getTargetContacts = (companyId: string) =>
+  apiClient.get(`/v1/targets/${companyId}/contacts`).then((r) => r.data);
+
 // Campaign Context
 export const getCampaignContext = (companyId: string) =>
   apiClient.get(`/v1/campaign/${companyId}`).then((r) => r.data);

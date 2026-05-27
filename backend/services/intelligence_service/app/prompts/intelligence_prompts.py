@@ -1,184 +1,93 @@
 BUSINESS_INTELLIGENCE_SYSTEM = """You are a senior B2B marketing analyst specializing in business intelligence extraction.
 Analyze all provided company data and extract structured intelligence.
 
-Your task: Extract comprehensive business intelligence from scraped company data.
-Focus on: industry classification, business model, value proposition, target segments, competitive landscape, and growth signals.
+PRIMARY FOCUS:
+1. Product intelligence — what the product does, who it's for, what problem it solves
+2. Target customer profile — industry, company size, departments, use cases
+3. Value proposition and key differentiators
+4. Growth signals and market position
 
-Output ONLY valid JSON. Be specific and data-driven. Avoid vague language."""
+The product_intelligence block is critical — it drives all downstream ICP generation,
+target company discovery, and outreach context.
+
+competitive_landscape: list 2-3 known competitors by name only (lightweight).
+Do NOT elaborate on competitors — that is not the primary purpose of this platform.
+
+Be specific and data-driven. Avoid vague language.
+Output ONLY valid JSON."""
 
 
 def build_intelligence_prompt(intake_data: dict, scraped_data: dict) -> str:
-    website_text = scraped_data.get("website", {}).get("all_text", "")[:3000]
+    website = scraped_data.get("website", {})
+    homepage_headline = website.get("homepage_headline", "") or (website.get("homepage", {}) or {}).get("title", "")
+    homepage_copy = (website.get("homepage_copy", "") or "")[:1200]
+    product_page_text = (website.get("product_page_text", "") or "")[:2000]
+    pricing_page_text = (website.get("pricing_page_text", "") or "")[:800]
+    pricing_signals = website.get("pricing_signals", [])
+
     linkedin_data = scraped_data.get("linkedin", {})
     crunchbase_data = scraped_data.get("crunchbase", {})
 
-    return f"""Analyze this company and extract structured business intelligence.
+    # User-provided product hints — seeds for AI to enrich
+    intake_product_hints = ""
+    product_description = intake_data.get("product_description", "")
+    main_problem_solved = intake_data.get("main_problem_solved", "")
+    target_industry = intake_data.get("target_industry", [])
+    target_company_size = intake_data.get("target_company_size", "")
+    target_departments = intake_data.get("target_departments", [])
+    if any([product_description, main_problem_solved, target_industry, target_company_size, target_departments]):
+        intake_product_hints = f"""
+PRODUCT HINTS (user-provided — enrich from website):
+Description: {product_description}
+Main Problem Solved: {main_problem_solved}
+Target Industry: {target_industry}
+Target Company Size: {target_company_size}
+Main Buyer Departments: {target_departments}
+"""
 
-INTAKE FORM DATA:
+    return f"""Analyze this company and extract comprehensive business + product intelligence.
+
+INTAKE:
 Company: {intake_data.get("company_name", "")}
 Website: {intake_data.get("website_url", "")}
 Industry (self-reported): {intake_data.get("industry", "")}
-Business Model: {intake_data.get("business_model", "")}
-Product Type: {intake_data.get("product_type", "")}
 Geography: {intake_data.get("geography", "")}
-Company Size: {intake_data.get("company_size", "")}
-Target Market: {intake_data.get("target_market", "")}
-Services/Products: {intake_data.get("services_products", "")}
-Goals: {intake_data.get("goals", [])}
+Pricing Range: {intake_data.get("pricing_range", "")}
+{intake_product_hints}
+WEBSITE HOMEPAGE:
+Headline: {homepage_headline}
+Copy: {homepage_copy}
 
-WEBSITE CONTENT (first 3000 chars):
-{website_text}
+PRODUCT / FEATURES PAGE:
+{product_page_text if product_page_text else "(not found — infer from homepage)"}
 
-LINKEDIN DATA:
-Employee Count: {linkedin_data.get("employee_count", "unknown")}
-Specialities: {linkedin_data.get("specialities", [])}
+PRICING PAGE:
+{pricing_page_text if pricing_page_text else "(not found — infer from content)"}
+Pricing signals: {pricing_signals}
+
+LINKEDIN:
+Employees: {linkedin_data.get("employee_count", "unknown")}
 Tagline: {linkedin_data.get("tagline", "")}
-Description: {linkedin_data.get("description", "")}
+Specialities: {linkedin_data.get("specialities", [])}
+Description: {(linkedin_data.get("description", "") or "")[:400]}
 
-CRUNCHBASE DATA:
+CRUNCHBASE:
 Funding Stage: {crunchbase_data.get("funding_stage", "unknown")}
 Total Funding: ${crunchbase_data.get("total_funding_usd", 0):,}
 Categories: {crunchbase_data.get("categories", [])}
 
 COMPETITORS PROVIDED: {intake_data.get("competitors", [])}
 
-Extract the complete BusinessProfileSchema JSON for this company."""
+Extract the complete BusinessProfileSchema JSON including a fully populated product_intelligence block.
+The product_intelligence block MUST contain:
+- product_name: exact product/service name from website
+- product_description: 2-3 sentences describing what it does
+- main_features: 5-7 specific features (from product/features page or homepage)
+- main_problem_solved: the single biggest problem it solves
+- target_industry: the primary industry vertical it serves
+- target_company_size: ideal customer company size (e.g. "100-5000 employees", "Enterprise 500+")
+- deployment_model: Cloud SaaS / On-premise / Hybrid / API
+- use_cases: 3-5 specific use cases
+- pricing_signals: pricing tiers or price points found"""
 
 
-# ── Competitor Discovery ────────────────────────────────────────────────────
-
-COMPETITOR_DISCOVERY_SYSTEM = """You are a senior B2B competitive intelligence analyst with deep knowledge of the global SaaS and technology market.
-
-Your task: Discover real competitors for a company based on its profile and market context.
-
-Rules:
-1. Use your training knowledge of real companies in this market to identify genuine competitors.
-2. DO NOT include companies from the "User-Provided Hints" list — those are handled separately.
-3. Discover 4-6 direct competitors (same category, similar audience and pricing).
-4. Discover 2-3 indirect or emerging competitors (adjacent category or alternative solution).
-5. For each competitor, provide accurate, specific intelligence — not generic descriptions.
-6. Base competitiveness on: target audience overlap, feature similarity, pricing tier, messaging similarity, brand strength.
-
-Competitiveness level — output EXACTLY ONE of these strings:
-- "Highly Competitive"     — strong overlap across audience, features, pricing, and messaging
-- "Moderately Competitive" — some overlap but meaningful differences exist
-- "Less Competitive"       — different segment, audience, or pricing tier
-
-Discovery sources — set discovery_source to one of:
-- "ai_reasoning"      — discovered using your market knowledge
-- "google_search"     — inferred from search result data provided
-
-Output ONLY valid JSON matching the CompetitorDiscoveryResponse schema. No explanation, no markdown."""
-
-
-def build_competitor_discovery_prompt(
-    business_profile: dict,
-    scraped_data: dict,
-    user_provided_hints: list[str],
-) -> str:
-    website = scraped_data.get("website", {})
-    headline = website.get("homepage_headline", "")
-    copy = (website.get("homepage_copy", "") or "")[:1000]
-    all_text = (website.get("all_text", "") or "")[:1500]
-
-    google = scraped_data.get("google_search", {})
-    search_results = google.get("results", [])
-    search_snippets = "\n".join(
-        f"- {r.get('title','')}: {r.get('description','')[:150]}"
-        for r in search_results[:6]
-        if r.get("title")
-    )
-
-    company_name = business_profile.get("company_name", "")
-    industry = business_profile.get("industry", "")
-    sub_industry = business_profile.get("sub_industry", "")
-    value_prop = business_profile.get("value_proposition", "")
-    segments = business_profile.get("target_segments", [])
-    differentiators = business_profile.get("key_differentiators", [])
-    pricing_model = business_profile.get("pricing_model", "")
-    geographies = business_profile.get("geographies", [])
-    business_model = business_profile.get("business_model", "")
-    market_position = business_profile.get("market_position", "")
-    categories = business_profile.get("core_product_categories", [])
-
-    hints_str = "\n".join(f"- {h}" for h in user_provided_hints) if user_provided_hints else "None"
-
-    return f"""Discover competitors for this company.
-
-COMPANY PROFILE:
-Name: {company_name}
-Industry: {industry} / {sub_industry}
-Business Model: {business_model}
-Value Proposition: {value_prop}
-Product Categories: {categories}
-Target Segments: {segments}
-Key Differentiators: {differentiators}
-Pricing Model: {pricing_model}
-Geographies: {geographies}
-Market Position: {market_position}
-
-WEBSITE INTELLIGENCE:
-Headline: {headline}
-Homepage Copy: {copy}
-Content Excerpt: {all_text}
-
-GOOGLE SEARCH RESULTS (for market context):
-{search_snippets or "Not available"}
-
-USER-PROVIDED HINTS (context only — DO NOT include these in your output):
-{hints_str}
-
-Discover 4-6 direct competitors and 2-3 indirect/emerging competitors.
-Exclude any company already listed in the User-Provided Hints above.
-Return CompetitorDiscoveryResponse JSON."""
-
-
-# ── User-Suggested Competitor Enrichment ───────────────────────────────────
-
-COMPETITOR_EXTRACTION_SYSTEM = """You are a competitive intelligence analyst for a B2B marketing strategy team.
-
-Analyze competitor website content and extract structured competitive intelligence.
-
-For competitiveness_level, output EXACTLY ONE of these strings (no other values are valid):
-- "Highly Competitive"    — strong brand; significant overlap in positioning, audience, features, and/or pricing
-- "Moderately Competitive" — some overlap but meaningful differences exist in positioning or target audience
-- "Less Competitive"     — minimal overlap; different market segment, audience, or pricing tier
-
-Base the classification on inferred signals: market positioning overlap, feature similarity,
-audience overlap, brand strength, pricing tier overlap, messaging similarity.
-
-Output ONLY valid JSON matching the DiscoveredCompetitor schema. No explanation, no markdown."""
-
-
-def build_competitor_prompt(
-    company_name: str,
-    competitor_url: str,
-    competitor_data: dict,
-    company_context: str = "",
-) -> str:
-    homepage_headline = competitor_data.get("homepage_headline", "")
-    homepage_copy = (competitor_data.get("homepage_copy", "") or "")[:1200]
-    pricing_signals = competitor_data.get("pricing_signals", [])[:3]
-    all_text = (competitor_data.get("all_text", "") or "")[:1500]
-
-    return f"""Analyze this competitor and extract full competitive intelligence for {company_name}.
-
-COMPETITOR:
-URL: {competitor_url}
-Homepage Headline: {homepage_headline}
-Homepage Copy: {homepage_copy}
-Pricing Signals: {pricing_signals}
-Content Excerpt: {all_text}
-
-OUR COMPANY (for differentiation context):
-Name: {company_name}
-{company_context}
-
-Extract a DiscoveredCompetitor JSON. Set:
-- user_provided: true
-- discovered_by_ai: false
-- discovery_source: "user_provided"
-- competitor_type: direct (unless clearly indirect)
-- differentiation_opportunities: specific ways {company_name} can outperform this competitor
-- weaknesses: their weaknesses relative to {company_name}
-Infer competitiveness_level based on how directly this competitor overlaps with {company_name}."""

@@ -12,6 +12,10 @@ export const queryKeys = {
     profiles: (companyId: string) => ["icp", companyId] as const,
     profile: (companyId: string, icpId: string) => ["icp", companyId, icpId] as const,
   },
+  targets: {
+    companies: (companyId: string) => ["targets", "companies", companyId] as const,
+    contacts: (companyId: string) => ["targets", "contacts", companyId] as const,
+  },
   campaign: {
     context: (companyId: string) => ["campaign", companyId] as const,
   },

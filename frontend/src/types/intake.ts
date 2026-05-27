@@ -18,8 +18,12 @@ export interface IntakeFormData {
   linkedin_url?: string;
   additional_notes?: string;
 
-  // Step 2: Product (optional)
-  product_type?: string;
+  // Step 2: Product
+  product_description?: string;
+  main_problem_solved?: string;
+  target_industry?: string[];
+  target_company_size?: string;
+  target_departments?: string[];
   pricing_range?: string;
 
   // Step 3: Competitors (all optional)
